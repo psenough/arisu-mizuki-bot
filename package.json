@@ -1,0 +1,26 @@
+{
+  "name": "arisu-mizuki-bot",
+  "version": "1.0.0",
+  "description": "bot for twitch",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/psenough/arisu-mizuki-bot.git"
+  },
+  "keywords": [
+    "bot",
+    "twitch"
+  ],
+  "author": "ps",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/psenough/arisu-mizuki-bot/issues"
+  },
+  "homepage": "https://github.com/psenough/arisu-mizuki-bot#readme",
+  "dependencies": {
+    "tmi.js": "^1.2.1"
+  }
+}
