@@ -21,29 +21,48 @@ var options = {
 	channels: ["psenough"]
 };
 
-var client = new tmi.client(options);
-client.connect();
+var tmi_client = new tmi.client(options);
+tmi_client.connect();
 
-client.on("connected", function(address, port) { 
-	client.action("psenough", "Konichiwa!");
+tmi_client.on("connected", function(address, port) { 
+	tmi_client.action("psenough", "Konichiwa!");
 });
 
-client.on("chat", function(channel, user, message, self) {
+tmi_client.on("chat", function(channel, user, message, self) {
 	if (message === "!twitter") {
-		client.action("psenough", "http://twitter.com/psenough");
+		tmi_client.action("psenough", "http://twitter.com/psenough");
 	}
 	
-	if (message === "!guess") {
-		//client.action("psenough", "http://twitter.com/psenough");
+	if (message.substring(0, 6) === "!guess") {
+		let answer = message.slice(7, message.length);
+		//console.log('answer: ' + answer);
+		if (game.guessing === true) {
+			if (game.guess(answer, user.username) === true) {
+				sendMessage(JSON.stringify({'type': 'guess_correct', 'user': user.username, 'answer': answer}));
+				setTimeout(function(){ 
+								game.active_level++;
+								if (game.active_level >= game.levels.length) {
+									// end of game
+									sendMessage(JSON.stringify({'type': 'eog', 'historic': game.historic}));
+								} else {
+									// new level
+									sendMessage(JSON.stringify(game.getChallengeStruct()));
+								}
+							}, 20000);
+			} else {
+				sendMessage(JSON.stringify({'type': 'guess_wrong', 'user': user.username, 'answer': answer}));
+			}
+		}
 	}
 	
 });
 
-client.on("part", function (channel, username, self) {
-    client.action("psenough", username + " has left the building!");
+tmi_client.on("part", function (channel, username, self) {
+    tmi_client.action("psenough", username + " has left the building!");
 });
 
-
+//TODO: also read youtube livechat https://www.youtube.com/watch?v=8-PZLps8XdM
+// https://github.com/nullifiedcat/youtube-live-chat-everywhere
 
 
 
@@ -172,7 +191,7 @@ ws_server.on('connection', function (client) {
 				if (parsed['screen'] === 'ready') {
 					logme('screen is ready');
 					//TODO: send current active challenge
-					client.send(JSON.stringify({ 'type': 'new_challenge', 'images': ['874c60a4dcab66609ebf98f1a73a3fbe.jpg','d1ce5275d63c3f61ec122c76ecf1c37a.jpg'], 'text': '(7+3) &#9647;&#9647;' }));
+					client.send(JSON.stringify(game.getChallengeStruct()));
 				}
 			}
 		}
@@ -200,6 +219,15 @@ ws_server.on('connection', function (client) {
     });
 });
 
+function getID(thisid) {
+    for (var i = 0; i < active_conn.length; i++) {
+        if (active_conn[i]['uid'] == thisid) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 function sendWebSocketUpdateToCanvas(thisparam) {
 	if (thisparam in params) {
 		for (var i = 0; i < active_conn.length; i++) {
@@ -212,6 +240,14 @@ function sendWebSocketUpdateToCanvas(thisparam) {
 	}
 }
 
+function sendMessage(messageObj) {
+	for (var i = 0; i < active_conn.length; i++) {
+		if (active_conn[i]['socket']) {
+			active_conn[i]['socket'].send(JSON.stringify(messageObj));
+		}
+	}
+}
+
 function getTimestamp() {
 	return (new Date()).getTime();
 }
@@ -219,3 +255,83 @@ function getTimestamp() {
 function logme(thistext) {
 	console.log(thistext);
 }
+
+
+
+//
+// game stuff
+//
+
+let Game = function() {
+	this.historic = [];
+	this.active_level = 0;
+	this.levels = [];
+	this.guessing = false;
+}
+
+Game.prototype.addHistoric = function(level, winner) {
+	this.historic.push({ 'level': level, 'winner': winner});
+}
+
+Game.prototype.getChallengeStruct = function() {
+	if (this.active_level <= this.levels.length) this.guessing = true;
+	return { 'type': 'new_challenge', 'level': this.levels[this.active_level], 'historic': this.historic }
+}
+	
+Game.prototype.guess = function(answer, player) {
+	if (answer.toLowerCase() === this.levels[this.active_level]['answer']) {
+		this.addHistoric(this.levels[this.active_level]['title'], player);
+		this.active_level++;
+		return true;
+	} else {
+		return false;
+	}
+}
+
+Game.prototype.loadLevels = function(levels) {
+	this.levels = levels;
+}
+
+
+let test_levels = [
+	{ 'title': 'Level 1', 'answer': 'super nova', 'images': ['874c60a4dcab66609ebf98f1a73a3fbe.jpg','d1ce5275d63c3f61ec122c76ecf1c37a.jpg'], 'text': '(7+3) &#9647;&#9647;' },
+	{ 'title': 'Level 2', 'answer': 'giraffe', 'images': ['d1ce5275d63c3f61ec122c76ecf1c37a.jpg'], 'text': 'yout mother' }
+];
+
+let game = new Game();
+game.loadLevels(test_levels);
+
+
+
+//
+// keyboard input
+// 
+
+
+//
+// simulate gamestate changes with arrow keys
+//
+
+stdin = process.stdin;
+stdin.on('data', function (data) {
+    if (data == '\u0003') { process.exit(); }
+	if (data == '\u001B\u005B\u0043') {
+		process.stdout.write('right');
+	}
+    if (data == '\u001B\u005B\u0044') {
+		process.stdout.write('left');
+	}
+	if (data == 'c') {
+		console.log(active_conn);
+	}
+	if (data == 'r') {
+		reassignParameters();
+	}
+	if (data == 'g') {
+		console.log(game);
+	}
+    process.stdout.write('Captured Key : ' + data + "\n");
+});
+stdin.setEncoding('utf8');
+stdin.setRawMode(true);
+stdin.resume();

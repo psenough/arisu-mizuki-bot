@@ -56,7 +56,7 @@ function connectWebSockets() {
 		// expect { 'type': 'new_challenge', 'images': ['gasdsaodh.jpg','jsbdoasdaois,jpg'], 'text': '_____ ___' }
 		// expect { 'type': 'new_guess', 'name': 'username', 'text': 'your mother', 'correct': true }
 		
-		if ('type' in parsed) {
+		if (parsed['type']) {
 			switch(parsed['type']) {
 				case 'new_challenge': {
 					console.log(parsed['text']);
